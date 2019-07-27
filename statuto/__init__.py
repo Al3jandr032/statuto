@@ -10,7 +10,6 @@ import os
 __version__ = "0.0.1"
 __all__ = ['load']
 
-
 class Loader(object):
     # TODO: load from other sources like, remote http, ssh, stream
     def getFileContent(self, file_path):
@@ -21,75 +20,69 @@ class Loader(object):
             content =_input.read()
         return content
 
+class Configurator(object):
+    required = set()
+    def __init__(self, configFile, _format, required=[], keysMapping={}):
+        self.configFile = configFile
+        self.format = _format
+        self.configObj = None
+        self.loaderObj = Loader()
+        self.required = set(required)
+        self.__mappedKeys = keysMapping
 
-def load(file_path,type_file):
-    # TODO: Make all the params and return always a dict or custum dict like object
-    ConfigObj = None
-    loaderObj = Loader()
-    content = loaderObj.getFileContent(file_path)
-    if type_file == "json":
-        ConfigObj = json.loads(content)
-    elif type_file == "yaml":
-        ConfigObj = yaml.load(content,  Loader=yaml.FullLoader)
-    elif type_file == "ini":
-        ConfigObj = configparser.ConfigParser()
-        ConfigObj.read(configFile)
-    elif type_file == "xml":
-        ConfigObj = BeautifulSoup(content,"html.parser")
-    else:
-        raise Exception("Not valid format")
-    return ConfigObj
+    def getConfigDict(self):
+        if self.format == "json":
+            self.configObj = self.__parseJson()
+        elif self.format == "yaml":
+            self.configObj = self.__parseYaml()
+        elif self.format == "ini":
+            self.configObj = self.__parseIni()
+        elif self.format == "xml":
+            self.configObj = self.__parseXml()
+        else:
+            raise Exception("Not valid format")
+        return self.configObj
 
+    def __parseIni(self):
+        conf = configparser.ConfigParser()
+        conf.read(self.configFile)
+        return self.__processIni(conf)
 
+    def __parseJson(self):
+        content = self.loaderObj.getFileContent(self.configFile)
+        conf = json.loads(content)
+        return conf
 
+    def __parseXml(self):
+        content = self.loaderObj.getFileContent(self.configFile)
+        conf = BeautifulSoup(content,"html.parser")
+        return conf
 
-from backports import configparser
+    def __parseYaml(self):
+        content = self.loaderObj.getFileContent(self.configFile)
+        conf = yaml.load(content,  Loader=yaml.FullLoader)
+        return conf
 
-class Configuration:
-    '''docstring for Configuration Class.
-
-    Some description about Configuration class.'''
-    DATABASE = {}
-    ROUTES = {}
-    MAIL = {}
-    WEB = {}
-  
-    conf = None
-    required = set(['ROUTES', 'DATABASE', 'WEB', 'TOKENS', 'TRANSLATIONS', 'SECURITY', 'CORS', 'BUCKET', 'ENCRYPTION'])
-    __mappedKeys = {
-        "CORS":[{
-            "key":"allowed",
-            "mapping": lambda _key : _key.split(",")
-        }]
-    }
-    def __init__(self, configFile='config.ini'):
-        '''Description of function __init__.
-
-        Parameters
-        ---------- 
-        self : `type`
-                Description of self
-
-        Returns
-        -------
-        type
-            Description of return type'''        
-        Config = configparser.ConfigParser()
-        Config.read(configFile)
-        self.conf = Config
-        self.__loadConfig()
-
-    def __loadConfig(self):
-        sections = list(self.required.difference(set(self.conf.sections())))
-        if not sections:
-            for section in self.conf.sections():
+    def __processIni(self, conf):
+        result = {}
+        validating_sections = list(self.required.difference(set(conf.sections())))
+        if not validating_sections:
+            for section in conf.sections():
                 if section in self.__mappedKeys:
                     for item in self.__mappedKeys[section]:
                         _key = item["key"]
-                        if self.conf.has_option(section,_key):
-                            setattr(self, section.upper(), item["mapping"](self.conf.get(section,_key)))
+                        if conf.has_option(section,_key):
+                            result[section.upper()] = item["mapping"](conf.get(section,_key))
+                            # setattr(result, section.upper(), item["mapping"](conf.get(section,_key)))
                     continue
-                setattr(self,section,dict(self.conf.items(section)))
+                result[section] = dict(conf.items(section))
+                # setattr(result,section,dict(conf.items(section)))
         else:
-            raise AttributeError('Some sections are missing from config file', *sections)
+            raise AttributeError('Some sections are missing', *sections)
+        return result
 
+
+def load(file_path,type_file, mapping):
+    # TODO: Make all the params and return always a dict or custum dict like object
+    configuration = Configurator(file_path,type_file,keysMapping=mapping)
+    return configuration.getConfigDict()

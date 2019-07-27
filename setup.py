@@ -3,7 +3,9 @@ from setuptools import setup, find_packages
 with open("README.md", "r") as readme_file:
     readme = readme_file.read()
 
-requirements = []
+requirements = ["configparser>=3.7.4",
+                "beautifulsoup4>=4.8.0",
+                "PyYAML>=5.1.1"]
 
 setup(
     name="statuto",
@@ -19,7 +21,7 @@ setup(
     install_requires=requirements,
     classifiers=[
         "Programming Language :: Python :: 2.7",
-        "Programming Language :: Python :: 3.7",
+        # "Programming Language :: Python :: 3.7",
         'License :: OSI Approved :: MIT License'
     ],
 )

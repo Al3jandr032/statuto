@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 
 from backports import configparser
-from bs4 import BeautifulSoup
+# from bs4 import BeautifulSoup
+import xmltodict
 import json
 import yaml
 
@@ -19,6 +20,11 @@ class Loader(object):
         with open(file_path) as _input:
             content =_input.read()
         return content
+
+class Config(object):
+
+    def __init__(self):
+        pass
 
 class Configurator(object):
     required = set()
@@ -43,6 +49,13 @@ class Configurator(object):
             raise Exception("Not valid format")
         return self.configObj
 
+    def getConfigObj(self):
+        configObj = Config()
+        self.getConfigDict()
+        for k,v in self.configObj.items():
+            setattr(configObj,k,v)
+        return configObj
+
     def __parseIni(self):
         conf = configparser.ConfigParser()
         conf.read(self.configFile)
@@ -55,7 +68,7 @@ class Configurator(object):
 
     def __parseXml(self):
         content = self.loaderObj.getFileContent(self.configFile)
-        conf = BeautifulSoup(content,"html.parser")
+        conf = xmltodict.parse(content)
         return conf
 
     def __parseYaml(self):
@@ -68,21 +81,25 @@ class Configurator(object):
         validating_sections = list(self.required.difference(set(conf.sections())))
         if not validating_sections:
             for section in conf.sections():
+                # print "Section : ",section
+                result[section] = dict(conf.items(section))
                 if section in self.__mappedKeys:
                     for item in self.__mappedKeys[section]:
                         _key = item["key"]
                         if conf.has_option(section,_key):
-                            result[section.upper()] = item["mapping"](conf.get(section,_key))
+                            result[section][_key] = item["mapping"](conf.get(section,_key))
                             # setattr(result, section.upper(), item["mapping"](conf.get(section,_key)))
                     continue
-                result[section] = dict(conf.items(section))
+                
                 # setattr(result,section,dict(conf.items(section)))
         else:
             raise AttributeError('Some sections are missing', *sections)
         return result
 
 
-def load(file_path,type_file, mapping):
+def load(file_path,type_file, mapping, asDict=True):
     # TODO: Make all the params and return always a dict or custum dict like object
     configuration = Configurator(file_path,type_file,keysMapping=mapping)
-    return configuration.getConfigDict()
+    if asDict:
+        return configuration.getConfigDict()
+    return configuration.getConfigObj()
